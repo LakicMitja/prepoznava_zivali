@@ -14,6 +14,9 @@ import os
 import copy
 from torch.nn import functional as F
 import PIL
+from torch.utils.tensorboard import SummaryWriter
+%load_ext tensorboard
+%tensorboard --logdir=runs
 
 plt.ion()   # interactive mode
 
@@ -25,8 +28,8 @@ c = torch.version.cuda;
 # Normalizacija slik za učenje in validiranje
 data_transforms = {
     'train': transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
@@ -38,19 +41,22 @@ data_transforms = {
     ]),
 }
 
-data_dir = 'data/Animals10'
+data_dir = 'Serengeti Classes Filtered'
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
-                                             shuffle=True, num_workers=0)
+                                             shuffle=True, num_workers=4)
               for x in ['train', 'val']}
+
+
+writerTrain = SummaryWriter(log_dir="./runs/train")
+writerVal = SummaryWriter(log_dir="./runs/val")
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 
 def imshow(inp, title=None):
     inp = inp.numpy().transpose((1, 2, 0))
@@ -69,6 +75,7 @@ inputs, classes = next(iter(dataloaders['train']))
 out = torchvision.utils.make_grid(inputs)
 
 imshow(out, title=[class_names[x] for x in classes])
+
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
@@ -96,6 +103,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
+                # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward
@@ -113,11 +121,20 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 # statistika
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+
             if phase == 'train':
                 scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
+
+            if phase == 'train':
+              writerTrain.add_scalar('Loss', epoch_loss, epoch)
+              writerTrain.add_scalar('Accuracy', epoch_acc, epoch)
+
+            if phase == 'val':
+              writerVal.add_scalar('Loss', epoch_loss, epoch)
+              writerVal.add_scalar('Accuracy', epoch_acc, epoch)
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
@@ -171,7 +188,6 @@ def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation)
 
-
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -202,7 +218,6 @@ class BasicBlock(nn.Module):
             out = self.relu(out)
 
             return out
-
 
 class ResNet(nn.Module):
 
@@ -261,40 +276,59 @@ def resnet16(**kwargs):
     return model
 
 
-model_ft = resnet16()
-num_ftrs = model_ft.fc.in_features
+model_ft = resnet16(num_classes=60)
 
+num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, len(class_names))
 
 model_ft = model_ft.to(device)
 
-weights = [4863/2112, 4863/1668, 4863/3098, 4863/1866, 4863/4863, 4863/1446, 4863/2623, 4863/1820, 4863/4821, 4863/1862]
-class_weights = torch.FloatTensor(weights).cuda()
-
-criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+criterion = nn.CrossEntropyLoss()
 
 # Pregledamo, da so vsi parametri optimizirani
 optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
 # Klicanje metode za učenje modela
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=30)
+                       num_epochs=45)
 
 visualize_model(model_ft)
 
+
 # Napovedovanje
 idx_to_class = {
-    0: "butterfly",
-    1: "cat",
-    2: "chicken",
-    3: "cow",
-    4: "dog",
-    5: "elephant",
-    6: "horse",
-    7: "sheep",
-    8: "spider",
-    9: "squirrel"
+    0: "aardvark", 1: "aardwolf",
+    2: "baboon", 3: "bat",
+    4: "batearedfox", 5: "buffalo",
+    6: "bushbuck", 7: "caracal",
+    8: "cattle", 9: "cheetah",
+    10: "civet", 11: "dikdik",
+    12: "duiker", 13: "eland",
+    14: "elephant", 15: "fire",
+    16: "gazellegrants", 17: "gazellethomsons",
+    18: "genet", 19: "giraffe",
+    20: "guineafowl", 21: "hare",
+    22: "hartebeest", 23: "hippopotamus",
+    24: "honeybadger", 25: "human",
+    26: "hyenabrown", 27: "hyenaspotted",
+    28: "hyenastriped", 29: "impala",
+    30: "insectspider", 31: "jackal",
+    32: "koribustard", 33: "kudu",
+    34: "leopard", 35: "lioncub",
+    36: "lionfemale", 37: "lionmale",
+    38: "mongoose", 39: "monkeyvervet",
+    40: "ostrich", 41: "otherbird",
+    42: "pangolin", 43: "porcupine",
+    44: "reedbuck", 45: "reptiles",
+    46: "rhinoceros", 47: "rodents",
+    48: "secretarybird", 49: "serval",
+    50: "steenbok", 51: "topi",
+    52: "vulture", 53: "warthog",
+    54: "waterbuck", 55: "wildcat",
+    56: "wilddog", 57: "wildebeest",
+    58: "zebra", 59: "zorilla"
 }
 
 def predict(model, test_image_name):
@@ -323,6 +357,7 @@ def predict(model, test_image_name):
 PATH = './ResNet_Custom.pth'
 torch.save(model_ft.state_dict(), PATH)
 
+
 # Nalaganje modela
 model_ft = resnet16()
 num_ftrs = model_ft.fc.in_features
@@ -336,5 +371,4 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 model_ft.load_state_dict(torch.load('./ResNet_Custom.pth'))
 
 # Prepoznava živali z loadanim modelom
-predict(model_ft, "data/Animals10/val/spider/e83cb4072bf21c22d2524518b7444f92e37fe5d404b0144390f8c47ba7ebb0_640.jpg")
 visualize_model(model_ft)
