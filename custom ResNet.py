@@ -46,7 +46,7 @@ image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
-                                             shuffle=True, num_workers=4)
+                                             shuffle=True, num_workers=8)
               for x in ['train', 'val']}
 
 
@@ -276,7 +276,7 @@ def resnet16(**kwargs):
     return model
 
 
-model_ft = resnet16(num_classes=60)
+model_ft = resnet16(num_classes=10)
 
 num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, len(class_names))
@@ -292,43 +292,17 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
 # Klicanje metode za učenje modela
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=45)
+                       num_epochs=25)
 
 visualize_model(model_ft)
 
 
 # Napovedovanje
 idx_to_class = {
-    0: "aardvark", 1: "aardwolf",
-    2: "baboon", 3: "bat",
-    4: "batearedfox", 5: "buffalo",
-    6: "bushbuck", 7: "caracal",
-    8: "cattle", 9: "cheetah",
-    10: "civet", 11: "dikdik",
-    12: "duiker", 13: "eland",
-    14: "elephant", 15: "fire",
-    16: "gazellegrants", 17: "gazellethomsons",
-    18: "genet", 19: "giraffe",
-    20: "guineafowl", 21: "hare",
-    22: "hartebeest", 23: "hippopotamus",
-    24: "honeybadger", 25: "human",
-    26: "hyenabrown", 27: "hyenaspotted",
-    28: "hyenastriped", 29: "impala",
-    30: "insectspider", 31: "jackal",
-    32: "koribustard", 33: "kudu",
-    34: "leopard", 35: "lioncub",
-    36: "lionfemale", 37: "lionmale",
-    38: "mongoose", 39: "monkeyvervet",
-    40: "ostrich", 41: "otherbird",
-    42: "pangolin", 43: "porcupine",
-    44: "reedbuck", 45: "reptiles",
-    46: "rhinoceros", 47: "rodents",
-    48: "secretarybird", 49: "serval",
-    50: "steenbok", 51: "topi",
-    52: "vulture", 53: "warthog",
-    54: "waterbuck", 55: "wildcat",
-    56: "wilddog", 57: "wildebeest",
-    58: "zebra", 59: "zorilla"
+    0: "buffalo", 1: "cheetah", 2: "eland",
+    3: "elephant", 4: "gazelle",
+    5: "giraffe", 6: "hartebeest", 7: "impala",
+    8: "lion", 9: "zebra"
 }
 
 def predict(model, test_image_name):
